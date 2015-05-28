@@ -36,7 +36,9 @@ class wp_bootstrap_navwalker extends Walker_Nav_Menu {
 	 */
 	public function start_el( &$output, $item, $depth = 0, $args = array(), $id = 0 ) {
 		$indent = ( $depth ) ? str_repeat( "\t", $depth ) : '';
-
+		
+		$classes = empty( $item->classes ) ? array() : (array) $item->classes;
+		
 		/**
 		 * Dividers, Headers or Disabled
 		 * =============================
@@ -53,13 +55,39 @@ class wp_bootstrap_navwalker extends Walker_Nav_Menu {
 			$output .= $indent . '<li role="presentation" class="dropdown-header">' . esc_attr( $item->title );
 		} else if ( strcasecmp($item->attr_title, 'disabled' ) == 0 ) {
 			$output .= $indent . '<li role="presentation" class="disabled"><a href="#">' . esc_attr( $item->title ) . '</a>';
+		} else if ( in_array( 'navbar-text', $classes ) ) {
+			$output .= $indent . '<li><p class="navbar-text">' . esc_attr( $item->title ) . '</p>';
 		} else {
 
 			$class_names = $value = '';
-
-			$classes = empty( $item->classes ) ? array() : (array) $item->classes;
+			
+			$user_classes = array();
+			// System classes start at  ".menu-item". All the items before that are the user classes.
+			$system_class_index = array_search('menu-item', $classes);
+			if ($system_class_index === false) { // Don't know if this would happen, but try to catch it regardless.
+				$user_classes = $classes;
+			} else {
+				if ($system_class_index == 0 || ($system_class_index == 1 && $classes[0] == '')) {
+					// No user classes
+				} else {
+					$user_classes = $classes;
+					$user_classes = array_splice($user_classes, 0, $system_class_index);
+				}
+			}
+			
+			$button = false;
+			if ( in_array( 'btn', $user_classes ) ) {
+				// Get the button classes
+				$button = preg_grep('/^btn/', $user_classes);
+				// Remove them from the original class list
+				foreach ($button as $button_class) {
+					unset($classes[array_search($button_class, $classes)]);
+				}
+				$button = implode(' ', $button);
+			}
+			
 			$classes[] = 'menu-item-' . $item->ID;
-
+			
 			$class_names = join( ' ', apply_filters( 'nav_menu_css_class', array_filter( $classes ), $item, $args ) );
 
 			if ( $args->has_children )
@@ -74,7 +102,7 @@ class wp_bootstrap_navwalker extends Walker_Nav_Menu {
 			$id = $id ? ' id="' . esc_attr( $id ) . '"' : '';
 
 			$output .= $indent . '<li' . $id . $value . $class_names .'>';
-
+			
 			$atts = array();
 			$atts['title']  = ! empty( $item->title )	? $item->title	: '';
 			$atts['target'] = ! empty( $item->target )	? $item->target	: '';
@@ -89,9 +117,31 @@ class wp_bootstrap_navwalker extends Walker_Nav_Menu {
 			} else {
 				$atts['href'] = ! empty( $item->url ) ? $item->url : '';
 			}
-
+			
+			/*
+			 * Glyphicons/Font-Awesome
+			 * ===========
+			 * Since the the menu item is NOT a Divider or Header we check the see
+			 * if there is a value in the attr_title property. If the attr_title
+			 * property is NOT null we apply it as the class name for the glyphicon/font-awesome.
+			 */
+			$icon = '';
+			if ( ! empty( $item->attr_title ) ):
+				if (preg_match('/\bglyphicon\b/', esc_attr($item->attr_title)) !== 0):
+					$icon .= '<span class="glyphicon ' . esc_attr($item->attr_title) . '"></span>&nbsp;';
+				elseif (preg_match('/\bfa\b/', esc_attr($item->attr_title)) !== 0):
+					$icon .= '<i class="fa ' . esc_attr($item->attr_title) . '"></i>&nbsp;';
+				else: // Probably actually wanted a title
+					$atts['title'] = esc_attr($item->attr_title);
+				endif;
+			endif;
+			
+			if ($button) {
+				$atts['class'] .= ' ' . $button;
+			}
+			
 			$atts = apply_filters( 'nav_menu_link_attributes', $atts, $item, $args );
-
+			
 			$attributes = '';
 			foreach ( $atts as $attr => $value ) {
 				if ( ! empty( $value ) ) {
@@ -99,25 +149,26 @@ class wp_bootstrap_navwalker extends Walker_Nav_Menu {
 					$attributes .= ' ' . $attr . '="' . $value . '"';
 				}
 			}
-
-			$item_output = $args->before;
-
-			/*
-			 * Glyphicons
-			 * ===========
-			 * Since the the menu item is NOT a Divider or Header we check the see
-			 * if there is a value in the attr_title property. If the attr_title
-			 * property is NOT null we apply it as the class name for the glyphicon.
-			 */
-			if ( ! empty( $item->attr_title ) )
-				$item_output .= '<a'. $attributes .'><span class="glyphicon ' . esc_attr( $item->attr_title ) . '"></span>&nbsp;';
-			else
-				$item_output .= '<a'. $attributes .'>';
-
+			
+			$item_output = '';
+			
+			if ($button) {
+				$item_output .= '<p class="navbar-btn">';
+			}
+			
+			$item_output .= $args->before;
+			
+			$item_output .= '<a'. $attributes .'>';
+			$item_output .= $icon;
 			$item_output .= $args->link_before . apply_filters( 'the_title', $item->title, $item->ID ) . $args->link_after;
 			$item_output .= ( $args->has_children && 0 === $depth ) ? ' <span class="caret"></span></a>' : '</a>';
+			
 			$item_output .= $args->after;
-
+			
+			if ($button) {
+				$item_output .= '</p>';
+			}
+			
 			$output .= apply_filters( 'walker_nav_menu_start_el', $item_output, $item, $depth, $args );
 		}
 	}
