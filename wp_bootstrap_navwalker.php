@@ -107,6 +107,7 @@ class wp_bootstrap_navwalker extends Walker_Nav_Menu {
 			$atts['title']  = ! empty( $item->title )	? $item->title	: '';
 			$atts['target'] = ! empty( $item->target )	? $item->target	: '';
 			$atts['rel']    = ! empty( $item->xfn )		? $item->xfn	: '';
+			$atts['class']  = '';
 
 			// If item has_children add atts to a.
 			if ( $args->has_children && $depth === 0 ) {
